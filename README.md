@@ -10,66 +10,49 @@ function doGet(e) {
   }
 }
 
-function recordOvertime(data) {
+function recordOvertime(formData) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Overtime Counter");
-  const rows = sheet.getDataRange().getValues();
+  const data = sheet.getDataRange().getValues();
   const today = new Date().toLocaleDateString("en-GB");
+  const name = formData.name;
+  const type = formData.type;
+  const manager = formData.manager;
 
-  for (let i = 1; i < rows.length; i++) {
-    if (rows[i][0] === data.name) {
-      const rowIndex = i + 1;
-      const colIndex = getColumnIndex(data.type);
+  const colMap = {
+    "Workday OT": 2,
+    "Weekend OT": 3,
+    "Public Holiday OT": 4
+  };
 
-      if (colIndex !== -1) {
-        const currentValue = sheet.getRange(rowIndex, colIndex).getValue() || 0;
-        sheet.getRange(rowIndex, colIndex).setValue(currentValue + 1);
-        sheet.getRange(rowIndex, 5).setValue(data.manager); // Last Recorded By
-        sheet.getRange(rowIndex, 6).setValue(today);        // Last Recorded Date
-        sheet.getRange(rowIndex, 8).setValue("Yes");        // Email Sent?
+  const colIndex = colMap[type];
+  if (!colIndex) throw new Error("نوع الأوفر تايم غير معروف");
 
-        const email = sheet.getRange(rowIndex, 7).getValue();
-        const message = `مرحبًا ${data.name}،\n\nتم تسجيل ${data.type} بواسطة ${data.manager} بتاريخ ${today}.\n\nمع تحيات الإدارة.`;
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === name) {
+      const row = i + 1;
+      const current = sheet.getRange(row, colIndex).getValue() || 0;
+      sheet.getRange(row, colIndex).setValue(current + 1);
+      sheet.getRange(row, 5).setValue(manager);
+      sheet.getRange(row, 6).setValue(today);
+      sheet.getRange(row, 8).setValue("Yes");
 
-        MailApp.sendEmail({
-          to: email,
-          subject: "إشعار بأوفر تايم جديد",
-          body: message,
-          name: "إدارة الموارد البشرية"
-        });
+      const email = sheet.getRange(row, 7).getValue();
+      const msg = `مرحبًا ${name}،\nتم تسجيل ${type} بواسطة ${manager} بتاريخ ${today}.\n\nمع تحيات الإدارة.`;
 
-        return;
-      }
+      MailApp.sendEmail(email, "إشعار أوفر تايم", msg);
+      return;
     }
   }
 
-  throw new Error("❌ لم يتم العثور على الموظف.");
-}
-
-function getColumnIndex(type) {
-  switch (type) {
-    case "Workday OT": return 2;
-    case "Weekend OT": return 3;
-    case "Public Holiday OT": return 4;
-    default: return -1;
-  }
+  throw new Error("❌ لم يتم العثور على اسم الموظف في الشيت.");
 }
 
 function getOvertimeSummary() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Overtime Counter");
-  if (!sheet) return [];
-
   const data = sheet.getDataRange().getValues();
-  if (data.length <= 1) return [];
-
-  data.shift(); // remove header
+  data.shift();
 
   return data.map(row => [
-    row[0], // Employee Name
-    row[1] || 0, // Workday OT
-    row[2] || 0, // Weekend OT
-    row[3] || 0, // Public Holiday OT
-    row[4] || "", // Last Recorded By
-    row[5] || ""  // Last Recorded Date
+    row[0], row[1] || 0, row[2] || 0, row[3] || 0, row[4] || "", row[5] || ""
   ]);
 }
-
